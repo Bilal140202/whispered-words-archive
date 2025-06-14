@@ -117,6 +117,48 @@ export type Database = {
         }
         Relationships: []
       }
+      memory_capsules: {
+        Row: {
+          allow_public_sharing: boolean
+          audio_url: string | null
+          content: string
+          created_at: string
+          email_for_delivery: string | null
+          id: string
+          image_url: string | null
+          is_unlocked: boolean
+          unlock_date: string
+          unlocked_at: string | null
+          video_url: string | null
+        }
+        Insert: {
+          allow_public_sharing?: boolean
+          audio_url?: string | null
+          content: string
+          created_at?: string
+          email_for_delivery?: string | null
+          id?: string
+          image_url?: string | null
+          is_unlocked?: boolean
+          unlock_date: string
+          unlocked_at?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          allow_public_sharing?: boolean
+          audio_url?: string | null
+          content?: string
+          created_at?: string
+          email_for_delivery?: string | null
+          id?: string
+          image_url?: string | null
+          is_unlocked?: boolean
+          unlock_date?: string
+          unlocked_at?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
