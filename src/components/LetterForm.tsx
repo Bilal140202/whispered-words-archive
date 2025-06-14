@@ -70,7 +70,7 @@ const LetterForm: React.FC<{ onSubmit: () => void }> = ({ onSubmit }) => {
 
   return (
     <form
-      className="rounded-2xl shadow-diary bg-card p-6 border border-gray-200 max-w-2xl mx-auto mb-10"
+      className="rounded-2xl shadow-diary bg-card p-0 border-none max-w-none mx-auto mb-0"
       onSubmit={handleSubmit}
       autoComplete="off"
     >
@@ -83,7 +83,7 @@ const LetterForm: React.FC<{ onSubmit: () => void }> = ({ onSubmit }) => {
         className="w-full h-40 resize-vertical rounded-xl border border-gray-200 p-3 focus:outline-none focus:ring-2 focus:ring-primary transition"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Pour out your heart. Your letter is 100% anonymous and will be shared publicly…"
+        placeholder="Pour out your heart. Your letter is 100% anonymous and will appear in the public feed…"
         required
       />
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-4 gap-3">
