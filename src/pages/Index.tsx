@@ -1,5 +1,5 @@
-
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import LetterFeed from "@/components/LetterFeed";
 import AddLetterSheet from "@/components/AddLetterSheet";
 import { Plus } from "lucide-react";
@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 const Index = () => {
   const [refreshToken, setRefreshToken] = useState(0);
   const [showSheet, setShowSheet] = useState(false);
+  const navigate = useNavigate();
 
   function handleFormSubmit() {
     setRefreshToken((r) => r + 1);
@@ -47,7 +48,7 @@ const Index = () => {
         </p>
       </header>
 
-      {/* Floating Add Button */}
+      {/* Floating Add Letter Button */}
       <button
         aria-label="Compose new letter"
         className="fixed bottom-6 right-6 z-40 rounded-full bg-pink-400 hover:bg-pink-500 text-white shadow-lg w-16 h-16 flex items-center justify-center transition duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-200"
@@ -55,6 +56,23 @@ const Index = () => {
         style={{boxShadow: "0 8px 28px 0 rgba(234,76,169,0.09), 0 2px 6px 0 rgba(112, 99, 90, 0.10)"}}
       >
         <Plus size={30} />
+      </button>
+
+      {/* Floating Memory Capsule Button */}
+      <button
+        aria-label="Open memory capsule"
+        className="fixed bottom-6 left-6 z-40 rounded-full bg-purple-300 hover:bg-purple-400 text-white shadow-lg w-16 h-16 flex flex-col items-center justify-center transition duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-200"
+        onClick={() => navigate("/memory-capsule")}
+        style={{boxShadow: "0 8px 28px 0 rgba(124,58,237,0.09), 0 2px 6px 0 rgba(112, 99, 90, 0.10)"}}
+      >
+        {/* Capsule/lock/clock icon */}
+        <svg width={32} height={32} fill="none" viewBox="0 0 32 32">
+          <ellipse cx="16" cy="22" rx="12" ry="6" fill="#fff" fillOpacity="0.15" />
+          <rect x="8" y="12" width="16" height="10" rx="5" fill="#a78bfa"/>
+          <ellipse cx="16" cy="12" rx="5" ry="5" fill="#c4b5fd" />
+          <path d="M16 12v3m0 0h2m-2 0h-2" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+        <span className="text-xs text-purple-900 font-semibold mt-1">Capsule</span>
       </button>
 
       {/* Add Letter Sheet/Modal */}
