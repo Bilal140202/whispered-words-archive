@@ -1,11 +1,11 @@
 
 import React, { useEffect, useRef, useState } from "react";
-import { getLetters, TagType, Letter } from "@/utils/storage";
+import { supabase } from "@/integrations/supabase/client";
 import LetterCard from "./LetterCard";
 import { Search } from "lucide-react";
+import type { TagType } from "@/utils/storage";
 
 const TAGS: TagType[] = ["Love", "Regret", "Goodbye", "Gratitude", "Confession", "Rage", "Closure"];
-
 const PAGE_SIZE = 10;
 
 function sanitize(str: string): string {
@@ -22,22 +22,46 @@ const tagColor: Record<TagType, string> = {
   Closure: "bg-closure text-gray-700"
 };
 
+export interface Letter {
+  id: string;
+  text: string;
+  tag: TagType | null;
+  created_at: string;
+}
+
 const LetterFeed: React.FC<{ refreshToken?: number }> = ({ refreshToken }) => {
   const [letters, setLetters] = useState<Letter[]>([]);
+  const [loading, setLoading] = useState(false);
   const [tagFilter, setTagFilter] = useState<TagType | null>(null);
   const [search, setSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const feedRef = useRef<HTMLDivElement>(null);
 
-  // Fetch all letters
   useEffect(() => {
-    setLetters(getLetters());
+    async function fetchLetters() {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("letters")
+        .select("*")
+        .order("created_at", { ascending: false });
+      setLoading(false);
+      if (error) {
+        setLetters([]);
+        return;
+      }
+      setLetters((data || []).map(l => ({
+        id: l.id,
+        text: l.text,
+        tag: l.tag as TagType | null,
+        created_at: l.created_at,
+      })));
+    }
+    fetchLetters();
     setVisibleCount(PAGE_SIZE); // reset on new letter
     if (feedRef.current) feedRef.current.scrollTop = 0;
   }, [refreshToken]);
 
-  // Infinite scroll w/ 100px before end
   useEffect(() => {
     const el = feedRef.current;
     if (!el) return;
@@ -102,11 +126,18 @@ const LetterFeed: React.FC<{ refreshToken?: number }> = ({ refreshToken }) => {
         tabIndex={0}
         aria-label="Public letter feed"
       >
-        {filteredLetters.length === 0 ? (
+        {loading ? (
+          <div className="text-center text-gray-400 py-6">Loading...</div>
+        ) : filteredLetters.length === 0 ? (
           <div className="text-center text-gray-400 py-6">No letters yet.</div>
         ) : (
           filteredLetters.slice(0, visibleCount).map((letter) => (
-            <LetterCard key={letter.id} letter={letter} />
+            <LetterCard key={letter.id} letter={{
+              id: letter.id,
+              text: letter.text,
+              tag: letter.tag,
+              createdAt: new Date(letter.created_at).getTime()
+            }} />
           ))
         )}
         {visibleCount < filteredLetters.length && (
