@@ -1,6 +1,6 @@
-
 import React from "react";
 import { TagType } from "@/utils/storage";
+import LetterEngagementBar from "./LetterEngagementBar";
 
 const tagColor: Record<TagType, string> = {
   Love: "bg-love text-pink-700",
@@ -40,9 +40,12 @@ const LetterCard: React.FC<{
       </span>
     )}
     <p className="text-gray-800 min-h-[60px] whitespace-pre-line break-words text-base">{safeText(letter.text)}</p>
-    <div className="flex items-center justify-between mt-4">
+    <div className="flex items-center justify-between mt-4 mb-1">
       <span className="text-xs text-gray-400">{formatDate(letter.createdAt)}</span>
       <span className="italic text-xs text-gray-300">Anonymous</span>
+    </div>
+    <div className="mt-2">
+      <LetterEngagementBar letterId={letter.id} text={letter.text} tag={letter.tag} />
     </div>
   </div>
 );

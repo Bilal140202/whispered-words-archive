@@ -9,6 +9,90 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      letter_comments: {
+        Row: {
+          comment: string
+          created_at: string
+          id: string
+          letter_id: string
+        }
+        Insert: {
+          comment: string
+          created_at?: string
+          id?: string
+          letter_id: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          id?: string
+          letter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_letter"
+            columns: ["letter_id"]
+            isOneToOne: false
+            referencedRelation: "letters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      letter_likes: {
+        Row: {
+          created_at: string
+          id: string
+          letter_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          letter_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          letter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_letter"
+            columns: ["letter_id"]
+            isOneToOne: false
+            referencedRelation: "letters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      letter_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          id: string
+          letter_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          id?: string
+          letter_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          id?: string
+          letter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_letter"
+            columns: ["letter_id"]
+            isOneToOne: false
+            referencedRelation: "letters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       letters: {
         Row: {
           created_at: string
