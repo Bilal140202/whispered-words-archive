@@ -1,3 +1,4 @@
+
 import React, { useRef, useState } from "react";
 import { Share } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -21,25 +22,37 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
       const res = await fetch(`/functions/letter-image?letterId=${encodeURIComponent(letterId)}`);
       if (res.ok) {
         const { image } = await res.json();
-        setImgUrl(image);
-        setGenerating(false);
-        return image;
+        if (image) {
+          setImgUrl(image);
+          setGenerating(false);
+          console.log("Image generated from Edge Function:", image.slice(0, 80));
+          return image;
+        }
       }
-    } catch (err) {}
+    } catch (err) {
+      console.log("Failed calling Edge Function", err);
+    }
 
     // 2. Fallback: generate image from DOM using html-to-image
     if (letterRef.current) {
       try {
+        // Briefly set visibility to visible to improve chance of capture, then revert.
+        const prevVisibility = letterRef.current.style.visibility;
+        letterRef.current.style.visibility = 'visible';
+        letterRef.current.style.display = "block";
         const dataUrl = await toPng(letterRef.current, {
           cacheBust: true,
           backgroundColor: "#fff5fa",
           pixelRatio: 2,
         });
+        letterRef.current.style.visibility = prevVisibility;
         setImgUrl(dataUrl);
         setGenerating(false);
+        console.log("Image generated from html-to-image");
         return dataUrl;
-      } catch {
+      } catch (err) {
         setGenerating(false);
+        console.error("Unable to generate image:", err);
         toast({
           title: "Image Error",
           description: "Unable to generate image.",
@@ -95,7 +108,9 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
           variant: "default",
         });
         return;
-      } catch (err) {}
+      } catch (err) {
+        // fallback to clipboard below
+      }
     }
 
     try {
@@ -117,6 +132,8 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
   }
 
   function LetterRenderForImage() {
+    // Most likely to work: display:none breaks, opacity:0 sometimes doesn't render, so use visibility:hidden and pointerEvents:none
+    // We also add font loader style inline to help font rendering & force block layout
     return (
       <div
         ref={letterRef}
@@ -130,16 +147,23 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
           fontSize: "22px",
           color: "#222",
           position: "absolute",
-          top: "-9999px",
+          top: 0,
           left: 0,
-          zIndex: -999,
+          zIndex: -9999,
           pointerEvents: "none",
-          opacity: 0.01,
+          visibility: "hidden", // Don't use opacity here
           boxSizing: "border-box",
           display: "block",
+          //outline: "2px dashed #c6f", // Uncomment for debugging placement
         }}
         aria-hidden
       >
+        <style>
+          {`
+            @import url('https://fonts.googleapis.com/css2?family=Shadows+Into+Light&display=swap');
+          `}
+        </style>
+        {/* Watermark, Tag, Text */}
         {tag && (
           <span
             style={{
@@ -151,6 +175,7 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
               color: "#EA4CA9",
             }}
           >
+            {/* fallback for absent tag */}
             {tag}
           </span>
         )}
@@ -166,7 +191,8 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
             lineHeight: 1.45,
           }}
         >
-          {text}
+          {/* fallback if no text */}
+          {text ? text : <span style={{color: "#f00"}}>Image not rendered</span>}
         </div>
         <div
           style={{
@@ -243,3 +269,4 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
 };
 
 export default ShareButton;
+
