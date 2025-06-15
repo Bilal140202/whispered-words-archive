@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useInteractionBlock } from "@/hooks/useInteractionBlock";
@@ -19,26 +18,28 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
   async function fetchReactions() {
     setLoading(true);
     try {
-      // Fix: Only select emoji column, then count them per emoji
       const { data, error } = await supabase
         .from("letter_reactions")
         .select("emoji")
         .eq("letter_id", letterId);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      // Count up per emoji
+      // Initialize all counts to zero
       const emojiCounts: Record<string, number> = {};
+      EMOJIS.forEach(e => { emojiCounts[e] = 0; });
+
+      // Count up per emoji in the result
       (data || []).forEach((row: any) => {
-        emojiCounts[row.emoji] = (emojiCounts[row.emoji] ?? 0) + 1;
+        if (row.emoji && emojiCounts[row.emoji] !== undefined) {
+          emojiCounts[row.emoji] += 1;
+        }
       });
+
       setCounts(emojiCounts);
 
-      // Detect if IP (user) has reacted (by checking anon_interaction_logs for reaction)
+      // Detect if IP (user) has reacted
       let markedEmoji: string | null = null;
-
       for (const emoji of EMOJIS) {
         if (isBlocked("reaction", emoji)) {
           markedEmoji = emoji;
@@ -49,6 +50,7 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
 
       setLoading(false);
       setError(null);
+      // Debug logs
       console.log("[EmojiReactionBar] fetchReactions", { letterId, emojiCounts, data, markedEmoji });
     } catch (e) {
       setLoading(false);
@@ -117,6 +119,9 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
 
   return (
     <div className="flex items-center gap-1 text-lg select-none">
+      {loading && (
+        <span className="text-xs text-gray-400 animate-pulse mr-2">Loading...</span>
+      )}
       {EMOJIS.map((emoji) => (
         <button
           key={emoji}
@@ -130,7 +135,8 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
         >
           {emoji}
           <span className="ml-1 text-xs text-gray-400">
-            {counts[emoji] > 0 ? counts[emoji] : ""}
+            {/* Always show 0 or more */}
+            {counts[emoji] ?? 0}
           </span>
         </button>
       ))}
@@ -142,4 +148,3 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
 };
 
 export default EmojiReactionBar;
-
