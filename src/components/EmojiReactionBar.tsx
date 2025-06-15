@@ -19,11 +19,17 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
   async function fetchReactions() {
     setLoading(true);
     try {
-      const { data } = await supabase
+      // Fix: Only select emoji column, then count them per emoji
+      const { data, error } = await supabase
         .from("letter_reactions")
-        .select("emoji, count:emoji")
+        .select("emoji")
         .eq("letter_id", letterId);
 
+      if (error) {
+        throw error;
+      }
+
+      // Count up per emoji
       const emojiCounts: Record<string, number> = {};
       (data || []).forEach((row: any) => {
         emojiCounts[row.emoji] = (emojiCounts[row.emoji] ?? 0) + 1;
@@ -31,7 +37,6 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
       setCounts(emojiCounts);
 
       // Detect if IP (user) has reacted (by checking anon_interaction_logs for reaction)
-      // Since we don't have access to IP, we rely on localStorage tracking ONLY for UI
       let markedEmoji: string | null = null;
 
       for (const emoji of EMOJIS) {
@@ -125,7 +130,7 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
         >
           {emoji}
           <span className="ml-1 text-xs text-gray-400">
-            {(counts[emoji] || 0) > 0 ? counts[emoji] : ""}
+            {counts[emoji] > 0 ? counts[emoji] : ""}
           </span>
         </button>
       ))}
@@ -137,3 +142,4 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
 };
 
 export default EmojiReactionBar;
+
