@@ -3,6 +3,14 @@ import React, { useState, useEffect } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 
+// Helper to escape user content (defense in depth)
+function escapeHtml(str: string) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -13,6 +21,7 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
   const [comments, setComments] = useState<{id: string, comment: string, created_at: string}[]>([]);
   const [newComment, setNewComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function fetchComments() {
     const { data } = await supabase
@@ -30,12 +39,32 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!newComment.trim()) return;
+    setError(null);
     setSubmitting(true);
-    await supabase
+    // Must enforce max length clientside to avoid wasted requests, but backend rejects anyway
+    if (newComment.trim().length > 240) {
+      setError("Comment must be 240 characters or less.");
+      setSubmitting(false);
+      return;
+    }
+    const { error: insertError } = await supabase
       .from("letter_comments")
       .insert([{ letter_id: letterId, comment: newComment.trim() }]);
+    if (insertError) {
+      // If it's a length or sanitization error, tell user
+      if (insertError.message && insertError.message.match(/char_length|length|maxlen/i)) {
+        setError("Comment must be 240 characters or less.");
+      } else if (insertError.message && insertError.message.match(/invalid input syntax|violates check constraint/i)) {
+        setError("Comment rejected by server. Try editing your text.");
+      } else {
+        setError("Failed to post comment. Please try again.");
+      }
+      setSubmitting(false);
+      return;
+    }
     setNewComment("");
     setSubmitting(false);
+    setError(null);
     fetchComments();
   }
 
@@ -49,7 +78,10 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
           ) : (
             comments.map(c => (
               <div key={c.id} className="bg-gray-50 rounded-lg py-2 px-3 text-sm text-gray-700 shadow-sm">
-                {c.comment}
+                {/* Output sanitized comment text as HTML */}
+                <span
+                  dangerouslySetInnerHTML={{ __html: escapeHtml(c.comment) }}
+                />
                 <div className="text-xs text-gray-400 mt-1">{new Date(c.created_at).toLocaleString()}</div>
               </div>
             ))
@@ -58,12 +90,16 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
         <form onSubmit={handleSend} className="flex gap-2 mt-3">
           <input
             value={newComment}
-            onChange={e => setNewComment(e.target.value)}
+            onChange={e => {
+              setError(null);
+              setNewComment(e.target.value);
+            }}
             className="flex-1 border rounded-lg py-2 px-3 focus:outline-none focus:ring-pink-200 text-gray-700"
             placeholder="Write a comment…"
             maxLength={240}
             required
             disabled={submitting}
+            aria-describedby="comment-help"
           />
           <button
             type="submit"
@@ -73,9 +109,16 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
             Send
           </button>
         </form>
+        {error && (
+          <div className="text-xs text-red-600 mt-2 px-2">{error}</div>
+        )}
+        <div className="text-xs text-gray-400 mt-1" id="comment-help">
+          Max 240 characters. Offensive content will be removed.
+        </div>
       </SheetContent>
     </Sheet>
   );
 };
 
 export default CommentSheet;
+
