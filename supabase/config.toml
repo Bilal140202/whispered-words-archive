@@ -1,1 +1,4 @@
 project_id = "hvhmidzgohpxtkqgvndm"
+
+[functions.interaction-guard]
+verify_jwt = false
