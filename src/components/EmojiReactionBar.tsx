@@ -13,7 +13,8 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isBlocked, mark } = useInteractionBlock(letterId);
+  const { isBlocked, mark, unmark } = useInteractionBlock(letterId);
+  const [myEmoji, setMyEmoji] = useState<string | null>(null);
 
   async function fetchReactions() {
     setLoading(true);
@@ -28,9 +29,22 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
         emojiCounts[row.emoji] = (emojiCounts[row.emoji] ?? 0) + 1;
       });
       setCounts(emojiCounts);
+
+      // Detect if IP (user) has reacted (by checking anon_interaction_logs for reaction)
+      // Since we don't have access to IP, we rely on localStorage tracking ONLY for UI
+      let markedEmoji: string | null = null;
+
+      for (const emoji of EMOJIS) {
+        if (isBlocked("reaction", emoji)) {
+          markedEmoji = emoji;
+          break;
+        }
+      }
+      setMyEmoji(markedEmoji);
+
       setLoading(false);
       setError(null);
-      console.log("[EmojiReactionBar] fetchReactions", { letterId, emojiCounts, data });
+      console.log("[EmojiReactionBar] fetchReactions", { letterId, emojiCounts, data, markedEmoji });
     } catch (e) {
       setLoading(false);
       setError("Failed to load reactions");
@@ -41,20 +55,20 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
 
   useEffect(() => {
     fetchReactions();
+    // eslint-disable-next-line
   }, [letterId]);
 
   async function handleReact(emoji: string) {
     console.log("[EmojiReactionBar] handleReact", { letterId, emoji });
-    if (isBlocked("reaction", emoji)) {
-      setError("Already reacted with this emoji!");
-      toast({ title: "Reaction blocked", description: "Already reacted with this emoji!", variant: "destructive" });
-      return;
-    }
+
+    const alreadyReacted = myEmoji === emoji;
     setLoading(true);
     setError(null);
+
     try {
       const body = { letterId, action: "reaction", emoji };
-      console.log("[EmojiReactionBar] Sending to edge", body);
+      console.log("[EmojiReactionBar] Sending to edge", { ...body, alreadyReacted });
+
       const resp = await fetch(`${supabaseEdgeUrl}/interaction-guard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -69,16 +83,21 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
         setLoading(false);
         return;
       }
-      const { error: supaError } = await supabase
-        .from("letter_reactions")
-        .insert([{ letter_id: letterId, emoji }]);
-      if (supaError) {
-        setError("Failed to record reaction: " + supaError.message);
-        toast({ title: "Reaction failed", description: supaError.message, variant: "destructive" });
+
+      if (data.undone) {
+        // Undo was successful
+        unmark("reaction", emoji);
+        setMyEmoji(null);
         setLoading(false);
+        setError(null);
+        fetchReactions();
+        toast({ title: "Reaction removed", description: "Your reaction was removed!" });
         return;
       }
+
+      // Reaction succeeded (new one)
       mark("reaction", emoji);
+      setMyEmoji(emoji);
       setLoading(false);
       setError(null);
       fetchReactions();
@@ -98,9 +117,11 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
           key={emoji}
           type="button"
           aria-label={`React with ${emoji}`}
-          className="hover:scale-110 transition rounded hover:bg-pink-50 focus:outline-none px-2"
+          className={`hover:scale-110 transition rounded px-2 focus:outline-none
+            ${myEmoji === emoji ? "bg-pink-200/60" : "hover:bg-pink-50"}
+          `}
           onClick={() => handleReact(emoji)}
-          disabled={loading || isBlocked("reaction", emoji)}
+          disabled={loading || (myEmoji !== null && myEmoji !== emoji)}
         >
           {emoji}
           <span className="ml-1 text-xs text-gray-400">

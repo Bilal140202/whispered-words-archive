@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 
@@ -53,9 +52,8 @@ serve(async (req) => {
       });
     }
 
-    // --- SPAM PROTECTION LOGIC START ---
+    // --- SPAM PROTECTION AND UNDO LOGIC START ---
 
-    // Only allow one comment per (ip, letter_id)
     if (action === "comment") {
       let { count, error } = await supabase
         .from("anon_interaction_logs")
@@ -63,7 +61,6 @@ serve(async (req) => {
         .eq("ip", ip)
         .eq("letter_id", letterId)
         .eq("action", "comment");
-
       if (error) {
         console.log("[edge] COMMENT check error", { ip, letterId, error });
         return new Response(JSON.stringify({ error: "Failed to check comment quota." }), {
@@ -78,9 +75,9 @@ serve(async (req) => {
           status: 429,
         });
       }
+      // (continue normal comment process – only allow one)
     }
 
-    // Only allow one like per (ip, letter_id)
     if (action === "like") {
       let { count, error } = await supabase
         .from("anon_interaction_logs")
@@ -88,7 +85,6 @@ serve(async (req) => {
         .eq("ip", ip)
         .eq("letter_id", letterId)
         .eq("action", "like");
-
       if (error) {
         console.log("[edge] LIKE check error", { ip, letterId, error });
         return new Response(JSON.stringify({ error: "Failed to check like quota." }), {
@@ -103,34 +99,79 @@ serve(async (req) => {
           status: 429,
         });
       }
+      // (continue normal like process – only allow one)
     }
 
-    // Only allow one reaction per (ip, letter_id)
     if (action === "reaction") {
-      let { count, error } = await supabase
+      // UNDO LOGIC: Check if a reaction log exists for this IP+letter+emoji
+      let { data: logs, count, error } = await supabase
+        .from("anon_interaction_logs")
+        .select("*", { count: "exact" })
+        .eq("ip", ip)
+        .eq("letter_id", letterId)
+        .eq("action", "reaction")
+        .eq("emoji", emoji);
+
+      if (error) {
+        console.log("[edge] REACTION check error", { ip, letterId, emoji, error });
+        return new Response(JSON.stringify({ error: "Failed to check reaction quota." }), {
+          headers: corsHeaders,
+          status: 500,
+        });
+      }
+
+      if ((count ?? 0) > 0) {
+        // UNDO the reaction: delete from both anon_interaction_logs and letter_reactions
+        const { error: delLogErr } = await supabase
+          .from("anon_interaction_logs")
+          .delete()
+          .eq("ip", ip)
+          .eq("letter_id", letterId)
+          .eq("action", "reaction")
+          .eq("emoji", emoji);
+        const { error: delReactErr } = await supabase
+          .from("letter_reactions")
+          .delete()
+          .eq("letter_id", letterId)
+          .eq("emoji", emoji);
+
+        if (delLogErr || delReactErr) {
+          console.log("[edge] REACTION UNDO DELETE ERROR", { ip, letterId, emoji, delLogErr, delReactErr });
+          return new Response(JSON.stringify({ error: "Failed to undo reaction" }), {
+            headers: corsHeaders,
+            status: 500,
+          });
+        }
+        console.log("[edge] REACTION UNDO SUCCESS", { ip, letterId, emoji });
+        return new Response(JSON.stringify({ ok: true, undone: true }), { headers: corsHeaders, status: 200 });
+      }
+
+      // otherwise check for any reaction for this post (other emojis, by same IP)
+      let { count: anyReactionCount, error: anyReactionError } = await supabase
         .from("anon_interaction_logs")
         .select("*", { count: "exact", head: true })
         .eq("ip", ip)
         .eq("letter_id", letterId)
         .eq("action", "reaction");
 
-      if (error) {
-        console.log("[edge] REACTION check error", { ip, letterId, error });
+      if (anyReactionError) {
+        console.log("[edge] REACTION check error (any emoji)", { ip, letterId, anyReactionError });
         return new Response(JSON.stringify({ error: "Failed to check reaction quota." }), {
           headers: corsHeaders,
           status: 500,
         });
       }
-      if ((count ?? 0) > 0) {
-        console.log("[edge] DENIED: already reacted (any emoji)", { ip, letterId });
+      if ((anyReactionCount ?? 0) > 0) {
+        console.log("[edge] DENIED: already reacted (other emoji)", { ip, letterId });
         return new Response(JSON.stringify({ reason: "You have already reacted to this letter." }), {
           headers: corsHeaders,
           status: 429,
         });
       }
+      // (continue normal reaction insert)
     }
 
-    // --- SPAM PROTECTION LOGIC END ---
+    // --- SPAM PROTECTION AND UNDO LOGIC END ---
 
     // Log EVERY allowed interaction
     const logInsert: Record<string, any> = {
