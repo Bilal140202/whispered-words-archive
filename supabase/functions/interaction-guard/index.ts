@@ -25,6 +25,7 @@ serve(async (req) => {
     const { letterId, action, emoji } = await req.json();
 
     if (!letterId || !["comment", "reaction", "like"].includes(action)) {
+      console.log("[interaction-guard] Invalid params", { ip, letterId, action, emoji });
       return new Response(JSON.stringify({ error: "Invalid params" }), {
         headers: corsHeaders,
         status: 400,
@@ -39,6 +40,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (blocked) {
+      console.log("[interaction-guard] BLOCKED - on blocklist", { ip, reason: blocked.reason });
       return new Response(JSON.stringify({ blocked: true, reason: blocked.reason ?? "" }), {
         headers: corsHeaders,
         status: 429,
@@ -49,6 +51,7 @@ serve(async (req) => {
     let limited = false;
     if (action === "reaction") {
       if (!emoji || typeof emoji !== "string") {
+        console.log("[interaction-guard] REACTION MISSING EMOJI", { ip, letterId });
         return new Response(JSON.stringify({ error: "Missing emoji for reaction" }), {
           headers: corsHeaders,
           status: 400,
@@ -79,6 +82,7 @@ serve(async (req) => {
     }
 
     if (limited) {
+      console.log("[interaction-guard] LIMITED", { ip, letterId, action, emoji, limited });
       return new Response(JSON.stringify({ limited: true }), {
         headers: corsHeaders,
         status: 429,
@@ -94,6 +98,7 @@ serve(async (req) => {
       .gte("created_at", since);
 
     if ((hourCount ?? 0) > 10) {
+      console.log("[interaction-guard] SPAM RATE LIMIT - ip will be blocked", { ip, hourCount });
       await supabase.from("blocked_ips").upsert(
         { ip, reason: "Rate limit exceeded" },
         { onConflict: "ip" }
@@ -114,8 +119,10 @@ serve(async (req) => {
 
     await supabase.from("anon_interaction_logs").insert(logInsert);
 
+    console.log("[interaction-guard] SUCCESS", { ip, letterId, action, emoji });
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders, status: 200 });
   } catch (e) {
+    console.log("[interaction-guard] ERROR", { message: e.message, stack: e.stack });
     return new Response(JSON.stringify({ error: e.message }), {
       headers: corsHeaders,
       status: 500,
