@@ -48,6 +48,7 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
+    console.log("[CommentSheet] handleSend fired", { letterId, newComment });
     if (isBlocked("comment")) {
       setError("You have already commented on this letter.");
       return;
@@ -60,11 +61,12 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
       return;
     }
     try {
-      // Use full URL for Supabase Edge Function
+      const body = { letterId, action: "comment" };
+      console.log("[CommentSheet] Sending to edge", body);
       const resp = await fetch(`${supabaseEdgeUrl}/interaction-guard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ letterId, action: "comment" }),
+        body: JSON.stringify(body),
       });
       const data = await resp.json();
       console.log("[CommentSheet] interaction-guard response", resp.status, data);

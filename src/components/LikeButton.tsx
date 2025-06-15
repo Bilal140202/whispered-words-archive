@@ -33,6 +33,7 @@ const LikeButton: React.FC<Props> = ({ letterId }) => {
   }, [letterId]);
 
   async function handleLike() {
+    console.log("[LikeButton] handleLike clicked", { letterId });
     if (isBlocked("like")) {
       setError("Already liked!");
       return;
@@ -41,10 +42,12 @@ const LikeButton: React.FC<Props> = ({ letterId }) => {
     setError(null);
     console.log("[LikeButton] Attempting like", { letterId });
     try {
+      const body = { letterId, action: "like" };
+      console.log("[LikeButton] Sending to edge", body);
       const resp = await fetch(`${supabaseEdgeUrl}/interaction-guard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ letterId, action: "like" }),
+        body: JSON.stringify(body),
       });
       const data = await resp.json();
       console.log("[LikeButton] interaction-guard response", resp.status, data);

@@ -41,18 +41,20 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
   }, [letterId]);
 
   async function handleReact(emoji: string) {
+    console.log("[EmojiReactionBar] handleReact", { letterId, emoji });
     if (isBlocked("reaction", emoji)) {
       setError("Already reacted with this emoji!");
       return;
     }
     setLoading(true);
     setError(null);
-    console.log("[EmojiReactionBar] React attempt", { letterId, emoji });
     try {
+      const body = { letterId, action: "reaction", emoji };
+      console.log("[EmojiReactionBar] Sending to edge", body);
       const resp = await fetch(`${supabaseEdgeUrl}/interaction-guard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ letterId, action: "reaction" }),
+        body: JSON.stringify(body),
       });
       const data = await resp.json();
       console.log("[EmojiReactionBar] interaction-guard response", resp.status, data);

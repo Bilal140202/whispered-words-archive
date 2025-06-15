@@ -22,27 +22,38 @@ serve(async (req) => {
       req.headers.get("x-forwarded-for")?.split(",")[0] ??
       req.headers.get("x-real-ip") ??
       "unknown";
-    const { letterId, action, emoji } = await req.json();
-
-    // Minimal parameter check only
-    if (!letterId || !["comment", "reaction", "like"].includes(action)) {
-      console.log("[interaction-guard] Invalid params", { ip, letterId, action, emoji });
-      return new Response(JSON.stringify({ error: "Invalid params" }), {
+    let letterId, action, emoji;
+    try {
+      const body = await req.json();
+      letterId = body.letterId;
+      action = body.action;
+      emoji = body.emoji;
+      console.log("[edge] Incoming req", { ip, body });
+    } catch (parseErr) {
+      console.log("[edge] Malformed JSON", { ip });
+      return new Response(JSON.stringify({ error: "Malformed JSON body" }), {
         headers: corsHeaders,
         status: 400,
       });
     }
 
-    // For reactions, require emoji param
+    // Minimal parameter check only (log always)
+    if (!letterId || !["comment", "reaction", "like"].includes(action)) {
+      console.log("[edge] Invalid params", { ip, letterId, action, emoji });
+      return new Response(JSON.stringify({ error: "Invalid params" }), {
+        headers: corsHeaders,
+        status: 400,
+      });
+    }
     if (action === "reaction" && (!emoji || typeof emoji !== "string")) {
-      console.log("[interaction-guard] REACTION MISSING EMOJI", { ip, letterId });
+      console.log("[edge] REACTION MISSING EMOJI", { ip, letterId });
       return new Response(JSON.stringify({ error: "Missing emoji for reaction" }), {
         headers: corsHeaders,
         status: 400,
       });
     }
 
-    // Log EVERY interaction without any spam/block checks
+    // Log EVERY interaction
     const logInsert: Record<string, any> = {
       ip,
       letter_id: letterId,
@@ -50,13 +61,21 @@ serve(async (req) => {
     };
     if (action === "reaction" && emoji) logInsert.emoji = emoji;
 
-    await supabase.from("anon_interaction_logs").insert(logInsert);
+    const { error: logError } = await supabase.from("anon_interaction_logs").insert(logInsert);
 
-    console.log("[interaction-guard] ALL INTERACTIONS ALLOWED", { ip, letterId, action, emoji });
+    if (logError) {
+      console.log("[edge] DB INSERT ERROR", { ip, letterId, action, emoji, logError });
+      return new Response(JSON.stringify({ error: "DB insert failed", logError }), {
+        headers: corsHeaders,
+        status: 500,
+      });
+    }
+
+    console.log("[edge] ALLOWED", { ip, letterId, action, emoji });
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders, status: 200 });
   } catch (e) {
-    console.log("[interaction-guard] ERROR", { message: e.message, stack: e.stack });
-    return new Response(JSON.stringify({ error: e.message }), {
+    console.log("[edge] ERROR", { message: e.message, stack: e.stack });
+    return new Response(JSON.stringify({ error: String(e) }), {
       headers: corsHeaders,
       status: 500,
     });
