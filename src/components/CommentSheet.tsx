@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,12 +26,19 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
   const { isBlocked, mark } = useInteractionBlock(letterId);
 
   async function fetchComments() {
-    const { data } = await supabase
-      .from("letter_comments")
-      .select("*")
-      .eq("letter_id", letterId)
-      .order("created_at", { ascending: true });
-    setComments(data || []);
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("letter_comments")
+        .select("*")
+        .eq("letter_id", letterId)
+        .order("created_at", { ascending: true });
+      setComments(data || []);
+      setError(fetchError ? "Failed to load comments" : null);
+      console.log("[CommentSheet] fetchComments", { letterId, data, fetchError });
+    } catch (e) {
+      setError("Failed to load comments");
+      console.error("[CommentSheet] fetchComments error", e);
+    }
   }
 
   useEffect(() => {
@@ -50,32 +58,40 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
       setSubmitting(false);
       return;
     }
-    // Call backend edge function for limit/IP check
-    const resp = await fetch("/functions/v1/interaction-guard", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ letterId, action: "comment" }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      setError(data.reason || "Spam filter: Limit reached.");
+    try {
+      // Call backend edge function for limit/IP check
+      const resp = await fetch("/functions/v1/interaction-guard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ letterId, action: "comment" }),
+      });
+      const data = await resp.json();
+      console.log("[CommentSheet] interaction-guard response", resp.status, data);
+
+      if (!resp.ok) {
+        setError(data.reason || "Spam filter: Limit reached.");
+        setSubmitting(false);
+        return;
+      }
+      // Continue only if ok
+      const { error: insertError } = await supabase
+        .from("letter_comments")
+        .insert([{ letter_id: letterId, comment: newComment.trim() }]);
+      if (insertError) {
+        setError("Failed to post comment. " + insertError.message);
+        setSubmitting(false);
+        return;
+      }
+      mark("comment");
+      setNewComment("");
       setSubmitting(false);
-      return;
-    }
-    // Continue only if ok
-    const { error: insertError } = await supabase
-      .from("letter_comments")
-      .insert([{ letter_id: letterId, comment: newComment.trim() }]);
-    if (insertError) {
-      setError("Failed to post comment. " + insertError.message);
+      setError(null);
+      fetchComments();
+    } catch (e: any) {
+      setError("Error posting comment: " + e.message);
       setSubmitting(false);
-      return;
+      console.error("[CommentSheet] handleSend", e);
     }
-    mark("comment");
-    setNewComment("");
-    setSubmitting(false);
-    setError(null);
-    fetchComments();
   }
 
   return (
@@ -88,7 +104,6 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
           ) : (
             comments.map(c => (
               <div key={c.id} className="bg-gray-50 rounded-lg py-2 px-3 text-sm text-gray-700 shadow-sm">
-                {/* Output sanitized comment text as HTML */}
                 <span
                   dangerouslySetInnerHTML={{ __html: escapeHtml(c.comment) }}
                 />

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,14 +9,22 @@ type Props = { letterId: string };
 const LikeButton: React.FC<Props> = ({ letterId }) => {
   const [count, setCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { isBlocked, mark } = useInteractionBlock(letterId);
 
   async function fetchLikes() {
-    const { count } = await supabase
-      .from("letter_likes")
-      .select("*", { count: "exact", head: true })
-      .eq("letter_id", letterId);
-    setCount(count ?? 0);
+    try {
+      const { count } = await supabase
+        .from("letter_likes")
+        .select("*", { count: "exact", head: true })
+        .eq("letter_id", letterId);
+      setCount(count ?? 0);
+      setError(null);
+      console.log("[LikeButton] fetchLikes", { letterId, count });
+    } catch (e) {
+      setError("Failed to load likes");
+      console.error("[LikeButton] fetchLikes error", e);
+    }
   }
 
   useEffect(() => {
@@ -23,25 +32,45 @@ const LikeButton: React.FC<Props> = ({ letterId }) => {
   }, [letterId]);
 
   async function handleLike() {
-    if (isBlocked("like")) return;
-    setSubmitting(true);
-    // Call backend for rate-limit/block
-    const resp = await fetch("/functions/v1/interaction-guard", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ letterId, action: "reaction" }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      setSubmitting(false);
+    if (isBlocked("like")) {
+      setError("Already liked!");
       return;
     }
-    await supabase
-      .from("letter_likes")
-      .insert([{ letter_id: letterId }]);
-    mark("like");
-    setSubmitting(false);
-    fetchLikes();
+    setSubmitting(true);
+    setError(null);
+    console.log("[LikeButton] Attempting like", { letterId });
+    try {
+      // Call backend for rate-limit/block
+      const resp = await fetch("/functions/v1/interaction-guard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ letterId, action: "reaction" }),
+      });
+      const data = await resp.json();
+      console.log("[LikeButton] interaction-guard response", resp.status, data);
+
+      if (!resp.ok) {
+        setSubmitting(false);
+        setError(data.reason || "Spam protection: Like not allowed");
+        return;
+      }
+      const { error: supaError } = await supabase
+        .from("letter_likes")
+        .insert([{ letter_id: letterId }]);
+      if (supaError) {
+        setError("Failed to record like: " + supaError.message);
+        setSubmitting(false);
+        return;
+      }
+      mark("like");
+      setSubmitting(false);
+      fetchLikes();
+      setError(null);
+    } catch (e: any) {
+      setError("Error submitting like: " + e.message);
+      setSubmitting(false);
+      console.error("[LikeButton] handleLike error", e);
+    }
   }
 
   return (
@@ -54,6 +83,9 @@ const LikeButton: React.FC<Props> = ({ letterId }) => {
     >
       <Heart className={`w-5 h-5 group-hover:fill-pink-200`} />
       <span className="text-xs">{count}</span>
+      {error && (
+        <span className="ml-2 text-xs text-red-500">{error}</span>
+      )}
     </button>
   );
 };
