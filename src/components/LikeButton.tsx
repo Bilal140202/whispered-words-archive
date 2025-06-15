@@ -1,10 +1,11 @@
-
 import React, { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useInteractionBlock } from "@/hooks/useInteractionBlock";
 
 type Props = { letterId: string };
+
+const supabaseEdgeUrl = "https://hvhmidzgohpxtkqgvndm.supabase.co/functions/v1";
 
 const LikeButton: React.FC<Props> = ({ letterId }) => {
   const [count, setCount] = useState(0);
@@ -40,8 +41,7 @@ const LikeButton: React.FC<Props> = ({ letterId }) => {
     setError(null);
     console.log("[LikeButton] Attempting like", { letterId });
     try {
-      // Call backend for rate-limit/block
-      const resp = await fetch("/functions/v1/interaction-guard", {
+      const resp = await fetch(`${supabaseEdgeUrl}/interaction-guard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ letterId, action: "reaction" }),

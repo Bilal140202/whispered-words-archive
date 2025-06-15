@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +16,8 @@ type Props = {
   onOpenChange: (v: boolean) => void;
   letterId: string;
 };
+
+const supabaseEdgeUrl = "https://hvhmidzgohpxtkqgvndm.supabase.co/functions/v1";
 
 const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
   const [comments, setComments] = useState<{id: string, comment: string, created_at: string}[]>([]);
@@ -59,8 +60,8 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
       return;
     }
     try {
-      // Call backend edge function for limit/IP check
-      const resp = await fetch("/functions/v1/interaction-guard", {
+      // Use full URL for Supabase Edge Function
+      const resp = await fetch(`${supabaseEdgeUrl}/interaction-guard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ letterId, action: "comment" }),

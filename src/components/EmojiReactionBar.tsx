@@ -1,10 +1,11 @@
-
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useInteractionBlock } from "@/hooks/useInteractionBlock";
 
 const EMOJIS = ["❤️", "😢", "😡", "😭", "😱", "🤗", "😶"];
 type Props = { letterId: string };
+
+const supabaseEdgeUrl = "https://hvhmidzgohpxtkqgvndm.supabase.co/functions/v1";
 
 const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -20,7 +21,6 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
         .select("emoji, count:emoji")
         .eq("letter_id", letterId);
 
-      // Aggregate counts
       const emojiCounts: Record<string, number> = {};
       (data || []).forEach((row: any) => {
         emojiCounts[row.emoji] = (emojiCounts[row.emoji] ?? 0) + 1;
@@ -49,8 +49,7 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
     setError(null);
     console.log("[EmojiReactionBar] React attempt", { letterId, emoji });
     try {
-      // Backend rate limit
-      const resp = await fetch("/functions/v1/interaction-guard", {
+      const resp = await fetch(`${supabaseEdgeUrl}/interaction-guard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ letterId, action: "reaction" }),
