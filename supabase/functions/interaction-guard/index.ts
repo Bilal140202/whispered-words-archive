@@ -54,19 +54,19 @@ serve(async (req) => {
           status: 400,
         });
       }
+      // Now schema supports emoji column!
       const { count } = await supabase
         .from("anon_interaction_logs")
         .select("id", { count: "exact", head: true })
         .eq("ip", ip)
         .eq("letter_id", letterId)
         .eq("action", "reaction")
-        .eq("emoji", emoji);  // This assumes "emoji" exists as a column, but our schema does NOT have this. To work around, we CANNOT store the emoji in logs. Instead, we can allow per-device block, but on backend, allow multiple reactions if the combo (ip, letter_id, emoji) is new.
-      // Actually, since anon_interaction_logs has no "emoji" column, we need to allow >1 reactions per letter per IP, but we can only check 1 reaction per letter per IP. So this will work only if we add an "emoji" col (which the schema doesn't have). 
-      // Workaround: Don't block reactions at backend per emoji, just rate limit per hour. Frontend still blocks per emoji per device.
+        .eq("emoji", emoji);
       if ((count ?? 0) > 0) {
         limited = true;
       }
     } else {
+      // comment/like: still just one per letter+IP
       const { count } = await supabase
         .from("anon_interaction_logs")
         .select("id", { count: "exact", head: true })
@@ -85,7 +85,7 @@ serve(async (req) => {
       });
     }
 
-    // 3. Rate limit: >10 of this action in 1 hour -> block
+    // 3. Rate limit: >10 of this action in 1 hour -> block IP for spam
     const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { count: hourCount } = await supabase
       .from("anon_interaction_logs")
@@ -94,7 +94,6 @@ serve(async (req) => {
       .gte("created_at", since);
 
     if ((hourCount ?? 0) > 10) {
-      // Block this IP for spam
       await supabase.from("blocked_ips").upsert(
         { ip, reason: "Rate limit exceeded" },
         { onConflict: "ip" }
@@ -112,7 +111,6 @@ serve(async (req) => {
       action,
     };
     if (action === "reaction" && emoji) logInsert.emoji = emoji;
-    // This will be ignored by the DB (no emoji col), but harmless to submit.
 
     await supabase.from("anon_interaction_logs").insert(logInsert);
 

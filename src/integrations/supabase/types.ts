@@ -13,6 +13,7 @@ export type Database = {
         Row: {
           action: string
           created_at: string
+          emoji: string | null
           id: string
           ip: unknown
           letter_id: string
@@ -20,6 +21,7 @@ export type Database = {
         Insert: {
           action: string
           created_at?: string
+          emoji?: string | null
           id?: string
           ip: unknown
           letter_id: string
@@ -27,6 +29,7 @@ export type Database = {
         Update: {
           action?: string
           created_at?: string
+          emoji?: string | null
           id?: string
           ip?: unknown
           letter_id?: string
