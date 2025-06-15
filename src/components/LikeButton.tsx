@@ -44,7 +44,7 @@ const LikeButton: React.FC<Props> = ({ letterId }) => {
       const resp = await fetch(`${supabaseEdgeUrl}/interaction-guard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ letterId, action: "reaction" }),
+        body: JSON.stringify({ letterId, action: "like" }),
       });
       const data = await resp.json();
       console.log("[LikeButton] interaction-guard response", resp.status, data);

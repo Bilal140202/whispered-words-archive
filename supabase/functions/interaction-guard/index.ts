@@ -24,7 +24,7 @@ serve(async (req) => {
       "unknown";
     const { letterId, action } = await req.json();
 
-    if (!letterId || !["comment", "reaction"].includes(action)) {
+    if (!letterId || !["comment", "reaction", "like"].includes(action)) {
       return new Response(JSON.stringify({ error: "Invalid params" }), {
         headers: corsHeaders,
         status: 400,
