@@ -129,14 +129,14 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
           fontFamily: '"Inter", "Segoe UI", "Arial", "sans-serif", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
           fontSize: "22px",
           color: "#222",
-          position: "fixed",
-          top: 0,
-          left: "-9999px",
+          position: "absolute",
+          top: "-9999px",
+          left: 0,
           zIndex: -999,
           pointerEvents: "none",
-          opacity: 0,
+          opacity: 0.01,
           boxSizing: "border-box",
-          display: "block"
+          display: "block",
         }}
         aria-hidden
       >
@@ -180,6 +180,7 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
         >
           Anonymous
         </div>
+        {/* Watermark */}
         <div
           style={{
             position: "absolute",
