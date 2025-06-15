@@ -27,12 +27,12 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
       }
     } catch (err) {}
 
-    // 2. Fallback: generate image from DOM using html-to-image with correct watermark and hidden fallback
+    // 2. Fallback: generate image from DOM using html-to-image
     if (letterRef.current) {
       try {
         const dataUrl = await toPng(letterRef.current, {
           cacheBust: true,
-          backgroundColor: "#fff5fa", // explicit light pink background!
+          backgroundColor: "#fff5fa",
           pixelRatio: 2,
         });
         setImgUrl(dataUrl);
@@ -116,9 +116,7 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
     setImgUrl(imageUrl);
   }
 
-  // Much more robust: Use only inline styles for share image!
   function LetterRenderForImage() {
-    // This div is "visibility: hidden" but always "display: block" so it's actually rendered in DOM flow for html-to-image.
     return (
       <div
         ref={letterRef}
@@ -128,18 +126,17 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
           background: "#fff5fa",
           borderRadius: "30px",
           padding: "28px 32px",
-          fontFamily:
-            '"Inter", "Segoe UI", "Arial", "sans-serif", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+          fontFamily: '"Inter", "Segoe UI", "Arial", "sans-serif", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
           fontSize: "22px",
           color: "#222",
-          position: "absolute",
+          position: "fixed",
           top: 0,
-          left: 0,
+          left: "-9999px",
           zIndex: -999,
           pointerEvents: "none",
-          display: "block",
-          visibility: "hidden", // NOT opacity 0 or left -10000, so it gets rendered!
+          opacity: 0,
           boxSizing: "border-box",
+          display: "block"
         }}
         aria-hidden
       >
@@ -183,7 +180,6 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
         >
           Anonymous
         </div>
-        {/* NEW: Always watermark, bottom-right */}
         <div
           style={{
             position: "absolute",
@@ -200,7 +196,6 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
         >
           unsentletters.app
         </div>
-        {/* Envelope SVG remains */}
         <div
           style={{
             position: "absolute",
@@ -241,7 +236,6 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
           Download image
         </a>
       )}
-      {/* Hidden render for html-to-image fallback */}
       <LetterRenderForImage />
     </div>
   );
