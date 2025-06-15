@@ -12,10 +12,8 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
 
-  // Create a hidden letter DOM node for html-to-image fallback
   const letterRef = useRef<HTMLDivElement | null>(null);
 
-  // Generates an image of the letter and returns its URL
   async function generateImage() {
     setGenerating(true);
     setImgUrl(null);
@@ -28,14 +26,16 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
         setGenerating(false);
         return image;
       }
-    } catch (err) {
-      // backend/image API failed, fall back to front-end below
-    }
+    } catch (err) {}
 
-    // 2. Fallback: generate image from DOM using html-to-image
+    // 2. Fallback: generate image from DOM using html-to-image with safe inline styles
     if (letterRef.current) {
       try {
-        const dataUrl = await toPng(letterRef.current, { cacheBust: true });
+        const dataUrl = await toPng(letterRef.current, {
+          cacheBust: true,
+          backgroundColor: "#fff5fa", // explicit bg!
+          pixelRatio: 2,
+        });
         setImgUrl(dataUrl);
         setGenerating(false);
         return dataUrl;
@@ -59,28 +59,21 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
     }
   }
 
-  // Main click handler for unified share
   async function handleShare() {
     setGenerating(true);
     setImgUrl(null);
 
-    // 1. Generate image (try backend, fallback to frontend)
     const imageUrl = await generateImage();
 
-    // 2. Compose deep link (direct to the letter)
     const letterUrl = `${BASE_URL}/?letter=${encodeURIComponent(letterId)}`;
 
-    // 3. Try Native Web Share API if available (shares image+text+link)
     if (imageUrl && (navigator.canShare?.({ url: letterUrl }) || navigator.canShare?.({ files: [] }))) {
       try {
-        // Fetch the image blob for sharing (for mobile share sheets)
         let imageBlob: Blob;
         if (imageUrl.startsWith("data:")) {
-          // Data URL, convert to Blob
           const res = await fetch(imageUrl);
           imageBlob = await res.blob();
         } else {
-          // Regular URL, fetch as blob
           const response = await fetch(imageUrl);
           imageBlob = await response.blob();
         }
@@ -103,12 +96,9 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
           variant: "default",
         });
         return;
-      } catch (err) {
-        // If sharing failed, fallback to clipboard & download
-      }
+      } catch (err) {}
     }
 
-    // 4. Fallback: Copy letter link to clipboard, show image for download
     try {
       await navigator.clipboard.writeText(letterUrl);
       toast({
@@ -127,35 +117,96 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
     setImgUrl(imageUrl);
   }
 
-  // Renders an invisible copy of the letter used for html-to-image fallback.
-  // Designed to match the letter card style visually.
+  // Much more robust: Use only inline styles for share image!
   function LetterRenderForImage() {
     return (
       <div
         ref={letterRef}
-        className="w-[540px] h-[320px] bg-[#fff5fa] rounded-[30px] px-8 py-7 font-sans text-[22px] relative shrink-0 text-gray-900"
         style={{
+          width: "540px",
+          height: "320px",
+          background: "#fff5fa",
+          borderRadius: "30px",
+          padding: "28px 32px",
+          fontFamily:
+            '"Inter", "Segoe UI", "Arial", "sans-serif", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+          fontSize: "22px",
+          color: "#222",
           position: "fixed",
           top: 0,
-          left: '-10000px',
+          left: "-10000px",
           zIndex: -999,
           pointerEvents: "none",
-          opacity: 0,
+          opacity: 1,
+          boxSizing: "border-box",
         }}
-        aria-hidden // don't expose to screen readers
+        aria-hidden
       >
         {tag && (
-          <span className="absolute left-7 top-6 text-[32px] font-handwritten text-pink-500">
+          <span
+            style={{
+              position: "absolute",
+              left: "28px",
+              top: "24px",
+              fontSize: "32px",
+              fontFamily: '"Shadows Into Light", cursive, sans-serif',
+              color: "#EA4CA9",
+            }}
+          >
             {tag}
           </span>
         )}
-        <div className="mt-14 mb-2 whitespace-pre-line break-words min-h-[90px]">
+        <div
+          style={{
+            marginTop: "56px",
+            marginBottom: "8px",
+            whiteSpace: "pre-line",
+            wordBreak: "break-word",
+            minHeight: "90px",
+            color: "#222",
+            fontSize: "22px",
+            lineHeight: 1.45,
+          }}
+        >
           {text}
         </div>
-        <div className="absolute bottom-8 left-7 text-[18px] text-[#ad8cca]">Anonymous</div>
-        <div className="absolute bottom-6 right-12 text-[12px] text-[#e6acd7]">unsentletters.app</div>
-        <div className="absolute top-4 right-8">
-          <svg width="40" height="40" fill="none"><rect x="3" y="8" width="30" height="18" rx="4" fill="#FFD5EC"/><path d="M5 10l15 11 15-11" stroke="#EA4CA9" strokeWidth="1.2" /><circle cx="18" cy="25" r="3" fill="#EA4CA9" fillOpacity="0.09"/></svg>
+        <div
+          style={{
+            position: "absolute",
+            bottom: "32px",
+            left: "28px",
+            fontSize: "18px",
+            color: "#ad8cca",
+            fontFamily: "inherit",
+          }}
+        >
+          Anonymous
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            bottom: "24px",
+            right: "48px",
+            fontSize: "12px",
+            color: "#e6acd7",
+            fontFamily: "inherit",
+          }}
+        >
+          unsentletters.app
+        </div>
+        {/* Inline SVG element (for the cute envelope) */}
+        <div
+          style={{
+            position: "absolute",
+            top: "16px",
+            right: "32px",
+          }}
+        >
+          <svg width="40" height="40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="8" width="30" height="18" rx="4" fill="#FFD5EC"/>
+            <path d="M5 10l15 11 15-11" stroke="#EA4CA9" strokeWidth="1.2" />
+            <circle cx="18" cy="25" r="3" fill="#EA4CA9" fillOpacity="0.09"/>
+          </svg>
         </div>
       </div>
     );
