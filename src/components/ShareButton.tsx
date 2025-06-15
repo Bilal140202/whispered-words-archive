@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from "react";
 import { Share } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -28,12 +27,12 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
       }
     } catch (err) {}
 
-    // 2. Fallback: generate image from DOM using html-to-image with safe inline styles
+    // 2. Fallback: generate image from DOM using html-to-image with correct watermark and hidden fallback
     if (letterRef.current) {
       try {
         const dataUrl = await toPng(letterRef.current, {
           cacheBust: true,
-          backgroundColor: "#fff5fa", // explicit bg!
+          backgroundColor: "#fff5fa", // explicit light pink background!
           pixelRatio: 2,
         });
         setImgUrl(dataUrl);
@@ -119,6 +118,7 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
 
   // Much more robust: Use only inline styles for share image!
   function LetterRenderForImage() {
+    // This div is "visibility: hidden" but always "display: block" so it's actually rendered in DOM flow for html-to-image.
     return (
       <div
         ref={letterRef}
@@ -132,12 +132,13 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
             '"Inter", "Segoe UI", "Arial", "sans-serif", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
           fontSize: "22px",
           color: "#222",
-          position: "fixed",
+          position: "absolute",
           top: 0,
-          left: "-10000px",
+          left: 0,
           zIndex: -999,
           pointerEvents: "none",
-          opacity: 1,
+          display: "block",
+          visibility: "hidden", // NOT opacity 0 or left -10000, so it gets rendered!
           boxSizing: "border-box",
         }}
         aria-hidden
@@ -182,19 +183,24 @@ const ShareButton: React.FC<Props> = ({ letterId, text, tag }) => {
         >
           Anonymous
         </div>
+        {/* NEW: Always watermark, bottom-right */}
         <div
           style={{
             position: "absolute",
-            bottom: "24px",
-            right: "48px",
-            fontSize: "12px",
+            bottom: "16px",
+            right: "28px",
+            fontSize: "15px",
             color: "#e6acd7",
-            fontFamily: "inherit",
+            fontFamily: "monospace",
+            opacity: 0.83,
+            textShadow: "1px 1px 3px #fff5fa",
+            userSelect: "none",
+            pointerEvents: "none",
           }}
         >
           unsentletters.app
         </div>
-        {/* Inline SVG element (for the cute envelope) */}
+        {/* Envelope SVG remains */}
         <div
           style={{
             position: "absolute",
