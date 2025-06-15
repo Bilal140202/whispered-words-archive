@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useInteractionBlock } from "@/hooks/useInteractionBlock";
+import { toast } from "@/components/ui/use-toast";
 
 const EMOJIS = ["❤️", "😢", "😡", "😭", "😱", "🤗", "😶"];
 type Props = { letterId: string };
@@ -32,6 +34,7 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
     } catch (e) {
       setLoading(false);
       setError("Failed to load reactions");
+      toast({ title: "Fetch reactions failed", description: String(e), variant: "destructive" });
       console.error("[EmojiReactionBar] fetchReactions err", e);
     }
   }
@@ -44,6 +47,7 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
     console.log("[EmojiReactionBar] handleReact", { letterId, emoji });
     if (isBlocked("reaction", emoji)) {
       setError("Already reacted with this emoji!");
+      toast({ title: "Reaction blocked", description: "Already reacted with this emoji!", variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -61,6 +65,7 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
 
       if (!resp.ok) {
         setError(data.reason || "Spam protection: Reaction not allowed.");
+        toast({ title: "Reaction failed", description: data.reason || "Spam protection: Reaction not allowed.", variant: "destructive" });
         setLoading(false);
         return;
       }
@@ -69,6 +74,7 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
         .insert([{ letter_id: letterId, emoji }]);
       if (supaError) {
         setError("Failed to record reaction: " + supaError.message);
+        toast({ title: "Reaction failed", description: supaError.message, variant: "destructive" });
         setLoading(false);
         return;
       }
@@ -76,9 +82,11 @@ const EmojiReactionBar: React.FC<Props> = ({ letterId }) => {
       setLoading(false);
       setError(null);
       fetchReactions();
+      toast({ title: "Reaction succeeded", description: "Your reaction was added!" });
     } catch (e: any) {
       setLoading(false);
       setError("Error submitting reaction: " + e.message);
+      toast({ title: "Reaction failed", description: e.message, variant: "destructive" });
       console.error("[EmojiReactionBar] handleReact error", e);
     }
   }

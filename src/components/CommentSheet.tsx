@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useInteractionBlock } from "@/hooks/useInteractionBlock";
+import { toast } from "@/components/ui/use-toast";
 
 // Helper to escape user content (defense in depth)
 function escapeHtml(str: string) {
@@ -35,9 +37,13 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
         .order("created_at", { ascending: true });
       setComments(data || []);
       setError(fetchError ? "Failed to load comments" : null);
+      if (fetchError) {
+        toast({ title: "Comment fetch failed", description: fetchError.message, variant: "destructive" });
+      }
       console.log("[CommentSheet] fetchComments", { letterId, data, fetchError });
     } catch (e) {
       setError("Failed to load comments");
+      toast({ title: "Comment fetch failed", description: String(e), variant: "destructive" });
       console.error("[CommentSheet] fetchComments error", e);
     }
   }
@@ -51,12 +57,14 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
     console.log("[CommentSheet] handleSend fired", { letterId, newComment });
     if (isBlocked("comment")) {
       setError("You have already commented on this letter.");
+      toast({ title: "Comment blocked", description: "You have already commented on this letter.", variant: "destructive" });
       return;
     }
     setError(null);
     setSubmitting(true);
     if (newComment.trim().length > 240) {
       setError("Comment must be 240 characters or less.");
+      toast({ title: "Comment too long", description: "240 chars max.", variant: "destructive" });
       setSubmitting(false);
       return;
     }
@@ -73,6 +81,7 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
 
       if (!resp.ok) {
         setError(data.reason || "Spam filter: Limit reached.");
+        toast({ title: "Comment failed", description: data.reason || "Spam filter: Limit reached.", variant: "destructive" });
         setSubmitting(false);
         return;
       }
@@ -82,6 +91,7 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
         .insert([{ letter_id: letterId, comment: newComment.trim() }]);
       if (insertError) {
         setError("Failed to post comment. " + insertError.message);
+        toast({ title: "Comment post failed", description: insertError.message, variant: "destructive" });
         setSubmitting(false);
         return;
       }
@@ -90,9 +100,11 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
       setSubmitting(false);
       setError(null);
       fetchComments();
+      toast({ title: "Comment posted!", description: "Your comment was posted." });
     } catch (e: any) {
       setError("Error posting comment: " + e.message);
       setSubmitting(false);
+      toast({ title: "Comment failed", description: e.message, variant: "destructive" });
       console.error("[CommentSheet] handleSend", e);
     }
   }

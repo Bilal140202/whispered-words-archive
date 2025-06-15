@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useInteractionBlock } from "@/hooks/useInteractionBlock";
+import { toast } from "@/components/ui/use-toast";
 
 type Props = { letterId: string };
 
@@ -36,11 +38,13 @@ const LikeButton: React.FC<Props> = ({ letterId }) => {
     console.log("[LikeButton] handleLike clicked", { letterId });
     if (isBlocked("like")) {
       setError("Already liked!");
+      toast({ title: "Like blocked", description: "You've already liked this.", variant: "destructive" });
       return;
     }
     setSubmitting(true);
     setError(null);
     console.log("[LikeButton] Attempting like", { letterId });
+
     try {
       const body = { letterId, action: "like" };
       console.log("[LikeButton] Sending to edge", body);
@@ -55,6 +59,7 @@ const LikeButton: React.FC<Props> = ({ letterId }) => {
       if (!resp.ok) {
         setSubmitting(false);
         setError(data.reason || "Spam protection: Like not allowed");
+        toast({ title: "Like failed", description: data.reason || "Spam protection: Like not allowed", variant: "destructive" });
         return;
       }
       const { error: supaError } = await supabase
@@ -62,6 +67,7 @@ const LikeButton: React.FC<Props> = ({ letterId }) => {
         .insert([{ letter_id: letterId }]);
       if (supaError) {
         setError("Failed to record like: " + supaError.message);
+        toast({ title: "Like failed", description: supaError.message, variant: "destructive" });
         setSubmitting(false);
         return;
       }
@@ -69,9 +75,11 @@ const LikeButton: React.FC<Props> = ({ letterId }) => {
       setSubmitting(false);
       fetchLikes();
       setError(null);
+      toast({ title: "Like succeeded", description: "Your like was added!" });
     } catch (e: any) {
       setError("Error submitting like: " + e.message);
       setSubmitting(false);
+      toast({ title: "Like failed", description: e.message, variant: "destructive" });
       console.error("[LikeButton] handleLike error", e);
     }
   }
