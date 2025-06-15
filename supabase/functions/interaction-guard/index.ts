@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 
@@ -121,7 +122,7 @@ serve(async (req) => {
       }
 
       if ((count ?? 0) > 0) {
-        // UNDO the reaction: delete from both anon_interaction_logs and letter_reactions
+        // UNDO the reaction: delete from both anon_interaction_logs and letter_reactions *BY IP*
         const { error: delLogErr } = await supabase
           .from("anon_interaction_logs")
           .delete()
@@ -133,7 +134,8 @@ serve(async (req) => {
           .from("letter_reactions")
           .delete()
           .eq("letter_id", letterId)
-          .eq("emoji", emoji);
+          .eq("emoji", emoji)
+          .eq("ip", ip);
 
         if (delLogErr || delReactErr) {
           console.log("[edge] REACTION UNDO DELETE ERROR", { ip, letterId, emoji, delLogErr, delReactErr });
@@ -189,6 +191,22 @@ serve(async (req) => {
         headers: corsHeaders,
         status: 500,
       });
+    }
+
+    // Insert into letter_reactions (needs to include IP!)
+    if (action === "reaction" && emoji) {
+      // Ensure exactly 1 reaction per (letter, emoji, ip)
+      const { error: reactionInsertError } = await supabase
+        .from("letter_reactions")
+        .insert({
+          letter_id: letterId,
+          emoji: emoji,
+          ip: ip,
+        });
+      if (reactionInsertError) {
+        // Race condition: already exists? Ignore for now, rely on logs
+        console.log("[edge] ALREADY EXISTS or insert err (possibly fine)", { ip, letterId, emoji, reactionInsertError });
+      }
     }
 
     console.log("[edge] ALLOWED", { ip, letterId, action, emoji });

@@ -114,18 +114,21 @@ export type Database = {
           created_at: string
           emoji: string
           id: string
+          ip: unknown | null
           letter_id: string
         }
         Insert: {
           created_at?: string
           emoji: string
           id?: string
+          ip?: unknown | null
           letter_id: string
         }
         Update: {
           created_at?: string
           emoji?: string
           id?: string
+          ip?: unknown | null
           letter_id?: string
         }
         Relationships: [
