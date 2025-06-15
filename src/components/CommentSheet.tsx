@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
+import { useInteractionBlock } from "@/hooks/useInteractionBlock";
 
 // Helper to escape user content (defense in depth)
 function escapeHtml(str: string) {
@@ -22,6 +22,7 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
   const [newComment, setNewComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isBlocked, mark } = useInteractionBlock(letterId);
 
   async function fetchComments() {
     const { data } = await supabase
@@ -38,30 +39,39 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!newComment.trim()) return;
+    if (isBlocked("comment")) {
+      setError("You have already commented on this letter.");
+      return;
+    }
     setError(null);
     setSubmitting(true);
-    // Must enforce max length clientside to avoid wasted requests, but backend rejects anyway
     if (newComment.trim().length > 240) {
       setError("Comment must be 240 characters or less.");
       setSubmitting(false);
       return;
     }
+    // Call backend edge function for limit/IP check
+    const resp = await fetch("/functions/v1/interaction-guard", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ letterId, action: "comment" }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      setError(data.reason || "Spam filter: Limit reached.");
+      setSubmitting(false);
+      return;
+    }
+    // Continue only if ok
     const { error: insertError } = await supabase
       .from("letter_comments")
       .insert([{ letter_id: letterId, comment: newComment.trim() }]);
     if (insertError) {
-      // If it's a length or sanitization error, tell user
-      if (insertError.message && insertError.message.match(/char_length|length|maxlen/i)) {
-        setError("Comment must be 240 characters or less.");
-      } else if (insertError.message && insertError.message.match(/invalid input syntax|violates check constraint/i)) {
-        setError("Comment rejected by server. Try editing your text.");
-      } else {
-        setError("Failed to post comment. Please try again.");
-      }
+      setError("Failed to post comment. " + insertError.message);
       setSubmitting(false);
       return;
     }
+    mark("comment");
     setNewComment("");
     setSubmitting(false);
     setError(null);
@@ -121,4 +131,3 @@ const CommentSheet: React.FC<Props> = ({ open, onOpenChange, letterId }) => {
 };
 
 export default CommentSheet;
-

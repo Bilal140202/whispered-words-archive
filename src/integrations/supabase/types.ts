@@ -9,6 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      anon_interaction_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          ip: unknown
+          letter_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          ip: unknown
+          letter_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          ip?: unknown
+          letter_id?: string
+        }
+        Relationships: []
+      }
+      blocked_ips: {
+        Row: {
+          blocked_at: string
+          ip: unknown
+          reason: string | null
+        }
+        Insert: {
+          blocked_at?: string
+          ip: unknown
+          reason?: string | null
+        }
+        Update: {
+          blocked_at?: string
+          ip?: unknown
+          reason?: string | null
+        }
+        Relationships: []
+      }
       letter_comments: {
         Row: {
           comment: string
