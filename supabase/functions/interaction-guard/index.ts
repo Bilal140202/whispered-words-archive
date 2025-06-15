@@ -24,6 +24,7 @@ serve(async (req) => {
       "unknown";
     const { letterId, action, emoji } = await req.json();
 
+    // Minimal parameter check only
     if (!letterId || !["comment", "reaction", "like"].includes(action)) {
       console.log("[interaction-guard] Invalid params", { ip, letterId, action, emoji });
       return new Response(JSON.stringify({ error: "Invalid params" }), {
@@ -32,84 +33,16 @@ serve(async (req) => {
       });
     }
 
-    // 1. Check blocklist
-    const { data: blocked } = await supabase
-      .from("blocked_ips")
-      .select("*")
-      .eq("ip", ip)
-      .maybeSingle();
-
-    if (blocked) {
-      console.log("[interaction-guard] BLOCKED - on blocklist", { ip, reason: blocked.reason });
-      return new Response(JSON.stringify({ blocked: true, reason: blocked.reason ?? "" }), {
+    // For reactions, require emoji param
+    if (action === "reaction" && (!emoji || typeof emoji !== "string")) {
+      console.log("[interaction-guard] REACTION MISSING EMOJI", { ip, letterId });
+      return new Response(JSON.stringify({ error: "Missing emoji for reaction" }), {
         headers: corsHeaders,
-        status: 429,
+        status: 400,
       });
     }
 
-    // 2. Only one interaction of each type per letter per IP (and per emoji for reactions).
-    let limited = false;
-    if (action === "reaction") {
-      if (!emoji || typeof emoji !== "string") {
-        console.log("[interaction-guard] REACTION MISSING EMOJI", { ip, letterId });
-        return new Response(JSON.stringify({ error: "Missing emoji for reaction" }), {
-          headers: corsHeaders,
-          status: 400,
-        });
-      }
-      // Now schema supports emoji column!
-      const { count } = await supabase
-        .from("anon_interaction_logs")
-        .select("id", { count: "exact", head: true })
-        .eq("ip", ip)
-        .eq("letter_id", letterId)
-        .eq("action", "reaction")
-        .eq("emoji", emoji);
-      if ((count ?? 0) > 0) {
-        limited = true;
-      }
-    } else {
-      // comment/like: still just one per letter+IP
-      const { count } = await supabase
-        .from("anon_interaction_logs")
-        .select("id", { count: "exact", head: true })
-        .eq("ip", ip)
-        .eq("letter_id", letterId)
-        .eq("action", action);
-      if ((count ?? 0) > 0) {
-        limited = true;
-      }
-    }
-
-    if (limited) {
-      console.log("[interaction-guard] LIMITED", { ip, letterId, action, emoji, limited });
-      return new Response(JSON.stringify({ limited: true }), {
-        headers: corsHeaders,
-        status: 429,
-      });
-    }
-
-    // 3. Rate limit: >10 of this action in 1 hour -> block IP for spam
-    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count: hourCount } = await supabase
-      .from("anon_interaction_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("ip", ip)
-      .gte("created_at", since);
-
-    if ((hourCount ?? 0) > 10) {
-      console.log("[interaction-guard] SPAM RATE LIMIT - ip will be blocked", { ip, hourCount });
-      await supabase.from("blocked_ips").upsert(
-        { ip, reason: "Rate limit exceeded" },
-        { onConflict: "ip" }
-      );
-      return new Response(JSON.stringify({ blocked: true, reason: "Rate limited, try again later." }), {
-        headers: corsHeaders,
-        status: 429,
-      });
-    }
-
-    // 4. Log this interaction
+    // Log EVERY interaction without any spam/block checks
     const logInsert: Record<string, any> = {
       ip,
       letter_id: letterId,
@@ -119,7 +52,7 @@ serve(async (req) => {
 
     await supabase.from("anon_interaction_logs").insert(logInsert);
 
-    console.log("[interaction-guard] SUCCESS", { ip, letterId, action, emoji });
+    console.log("[interaction-guard] ALL INTERACTIONS ALLOWED", { ip, letterId, action, emoji });
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders, status: 200 });
   } catch (e) {
     console.log("[interaction-guard] ERROR", { message: e.message, stack: e.stack });
