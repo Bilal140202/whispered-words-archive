@@ -17,5 +17,11 @@ export function useInteractionBlock(letterId: string) {
     [letterId]
   );
 
-  return { isBlocked, mark };
+  // Add unmark (no-op)
+  const unmark = useCallback(
+    (_action: "comment" | "like" | "reaction", _emoji?: string) => {},
+    [letterId]
+  );
+
+  return { isBlocked, mark, unmark };
 }
