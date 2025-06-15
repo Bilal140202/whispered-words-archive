@@ -1,32 +1,19 @@
 
 import { useCallback } from "react";
 
-// LocalStorage keys: "ul_cmt_{letterId}", "ul_react_{letterId}_{emoji?}"
+// Blocker is disabled to allow all actions
 export function useInteractionBlock(letterId: string) {
-  function deviceKey(action: "comment" | "like" | "reaction", emoji?: string) {
-    return action === "reaction"
-      ? `ul_react_${letterId}_${emoji}`
-      : `ul_${action}_${letterId}`;
-  }
-
-  // Returns true if already interacted (per device)
+  // Always return false (never blocked)
   const isBlocked = useCallback(
-    (action: "comment" | "like" | "reaction", emoji?: string) => {
-      const key = deviceKey(action, emoji);
-      const value = localStorage.getItem(key);
-      console.log("[useInteractionBlock] isBlocked", { action, emoji, key, value });
-      return !!value;
+    (_action: "comment" | "like" | "reaction", _emoji?: string) => {
+      return false;
     },
     [letterId]
   );
 
-  // Mark as done
+  // Disabled (no-op)
   const mark = useCallback(
-    (action: "comment" | "like" | "reaction", emoji?: string) => {
-      const key = deviceKey(action, emoji);
-      localStorage.setItem(key, "1");
-      console.log("[useInteractionBlock] mark", { action, emoji, key });
-    },
+    (_action: "comment" | "like" | "reaction", _emoji?: string) => {},
     [letterId]
   );
 
