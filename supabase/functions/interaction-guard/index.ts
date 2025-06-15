@@ -37,7 +37,7 @@ serve(async (req) => {
       });
     }
 
-    // Minimal parameter check only (log always)
+    // Basic param check only (log always)
     if (!letterId || !["comment", "reaction", "like"].includes(action)) {
       console.log("[edge] Invalid params", { ip, letterId, action, emoji });
       return new Response(JSON.stringify({ error: "Invalid params" }), {
@@ -53,7 +53,86 @@ serve(async (req) => {
       });
     }
 
-    // Log EVERY interaction
+    // --- SPAM PROTECTION LOGIC START ---
+
+    // Only allow one comment per (ip, letter_id)
+    if (action === "comment") {
+      let { count, error } = await supabase
+        .from("anon_interaction_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("ip", ip)
+        .eq("letter_id", letterId)
+        .eq("action", "comment");
+
+      if (error) {
+        console.log("[edge] COMMENT check error", { ip, letterId, error });
+        return new Response(JSON.stringify({ error: "Failed to check comment quota." }), {
+          headers: corsHeaders,
+          status: 500,
+        });
+      }
+      if ((count ?? 0) > 0) {
+        console.log("[edge] DENIED: already commented", { ip, letterId });
+        return new Response(JSON.stringify({ reason: "You have already commented on this letter." }), {
+          headers: corsHeaders,
+          status: 429,
+        });
+      }
+    }
+
+    // Only allow one like per (ip, letter_id)
+    if (action === "like") {
+      let { count, error } = await supabase
+        .from("anon_interaction_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("ip", ip)
+        .eq("letter_id", letterId)
+        .eq("action", "like");
+
+      if (error) {
+        console.log("[edge] LIKE check error", { ip, letterId, error });
+        return new Response(JSON.stringify({ error: "Failed to check like quota." }), {
+          headers: corsHeaders,
+          status: 500,
+        });
+      }
+      if ((count ?? 0) > 0) {
+        console.log("[edge] DENIED: already liked", { ip, letterId });
+        return new Response(JSON.stringify({ reason: "You have already liked this letter." }), {
+          headers: corsHeaders,
+          status: 429,
+        });
+      }
+    }
+
+    // Only allow one reaction per (ip, letter_id)
+    if (action === "reaction") {
+      let { count, error } = await supabase
+        .from("anon_interaction_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("ip", ip)
+        .eq("letter_id", letterId)
+        .eq("action", "reaction");
+
+      if (error) {
+        console.log("[edge] REACTION check error", { ip, letterId, error });
+        return new Response(JSON.stringify({ error: "Failed to check reaction quota." }), {
+          headers: corsHeaders,
+          status: 500,
+        });
+      }
+      if ((count ?? 0) > 0) {
+        console.log("[edge] DENIED: already reacted (any emoji)", { ip, letterId });
+        return new Response(JSON.stringify({ reason: "You have already reacted to this letter." }), {
+          headers: corsHeaders,
+          status: 429,
+        });
+      }
+    }
+
+    // --- SPAM PROTECTION LOGIC END ---
+
+    // Log EVERY allowed interaction
     const logInsert: Record<string, any> = {
       ip,
       letter_id: letterId,
