@@ -1,7 +1,6 @@
-
 import React, { useState } from "react";
 import EmojiReactionBar from "./EmojiReactionBar";
-import LikeButton from "./LikeButton";
+// import LikeButton from "./LikeButton"; ❌ Removed
 import CommentButton from "./CommentButton";
 import ShareButton from "./ShareButton";
 import CommentSheet from "./CommentSheet";
@@ -20,7 +19,7 @@ const LetterEngagementBar: React.FC<Props> = ({ letterId, text, tag }) => {
       <EmojiReactionBar letterId={letterId} />
       <div className="flex items-center justify-between mt-1 text-sm">
         <div className="flex gap-3">
-          <LikeButton letterId={letterId} />
+          {/* Removed LikeButton */}
           <CommentButton letterId={letterId} onShowComments={() => setShowComments(true)} />
         </div>
         <ShareButton letterId={letterId} text={text} tag={tag} />
